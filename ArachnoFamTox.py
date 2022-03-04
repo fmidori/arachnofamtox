@@ -54,49 +54,15 @@ parser.add_argument("--tempfiles",action="store_true",
 
 args = parser.parse_args()
 
-
-def results(tsv):
-    total_correct = 0 
-    total_wrong = 0 
-    for i in range(2,6):
-        correct = 0
-        wrong = 0
-        with open(tsv, 'r') as t: 
-            for line in t:
-                #header = line.split('\t')[0].strip()
-                real_fam = line.split('\t')[0].split('_')[0].strip()
-                pred = line.split('\t')[6].strip() #for final = 2 ; for PSSM = 5;  for HMM = 6 
-                score = line.split('\t')[4].strip()
-                queryfam = define_final(real_fam)
-                if str(score) == str(i):
-                    if queryfam == pred:
-                        correct += 1
-                        #print(real_fam, pred, score)
-                    elif pred == 'GlycosylHydrolase_Hyaluronidase':
-                        correct += 1
-                        #print(real_fam, pred, score)
-                    else:
-                        wrong += 1
-                        #print(real_fam, pred, score)
-        print(i,correct,wrong)
-        total_correct += correct
-        total_wrong += wrong
-    print(total_correct,total_wrong)
-    print(total_correct/2739)
-    print(total_wrong/2739)
-    print(2739-total_correct)
-    t.close()
-    return (correct,wrong)
-
-
-
 def db_dir():
+    # Search for directory with models
     if Path('db').is_dir() == False:
         warn("stderr", "Models for PSSM and HMM not found")
         sys.exit(1)
     return None 
 
 def output_dir():
+    # Create output directory, if already exists, reuse it 
     if os.path.isdir(args.out):
         if args.force:
             warn("stdout", f"Reusing output directory {args.out}")
@@ -113,6 +79,7 @@ def output_dir():
         os.mkdir(args.out)
 
 def cpus():
+    # Check for available cpus
     cpus = args.cpu
     available_cpus = os.cpu_count()
     
@@ -127,6 +94,7 @@ def cpus():
     return None 
 
 def search_tools():
+    #Check for needed tools
     needed_tools = ("hmmscan", "rpsblast","blastp")
     for tool in needed_tools:
         if find_executable(tool) is None:
@@ -192,57 +160,51 @@ def parse_hmmscan(domtab):
     output = open(domtab + '.parsed', 'w')
     with open(domtab, 'r') as f:
         for record in SearchIO.parse(f, 'hmmscan3-domtab'):
-            #print(str(record.id) + '\t')
             hits = record.hits
             hsps = record.hsps
             num_hits = len(hits)
             num_hsps = len(hsps)
 
-            if num_hits > 0:
+            if num_hits > 0: 
                 for i in range(0,num_hits):
                     if (hsps[i].evalue <= 0.1) or (hsps[i].evalue == 0):
                         output.write(str(record.id) + '\t' + str(hits[i].id) + '\t' + str(hsps[i].evalue)  
                             + '\t' + str(hsps[i].bitscore) + '\t' + str(hsps[i].acc_avg) +  
                             '\t' +  str(record.seq_len) + '\t' + str(hits[i].description) + '\t' + 
                             str(hsps[i].env_start) + '\t' + str(hsps[i].env_end) + '\n')
-                    #else: print(str(record.id) + " " + str(hsps[i].evalue))
             else:
                 if (hsps.evalue <= 0.1) or (hsps.evalue == 0):
                     output.write(str(record.id) + '\t' + str(hits.id) + '\t' + str(hsps.evalue) + 
                         '\t' + str(hsps.bitscore) + '\t' + str(hsps.acc_avg) + 
                         '\t' +  str(record.seq_len) + '\t' + str(hits.description) + '\t' + 
                         str(hsps.env_start) + '\t' + str(hsps.env_end) + '\n' )
-                #else: print(str(record.id) + " " + str(hsps.evalue))
     f.close()
     return domtab + ".parsed"
 
 def merge_and_sort(tsv1, tsv2):
+    # Merge two tsvs and sort by first column 
+    # Generates merged output
     warn("stdout","Merging predictions")
     file1 = pd.read_csv(tsv1, sep='\t', names=['0','1','2','3','4','5','6','7','8'])
     file2 = pd.read_csv(tsv2, sep='\t', names=['0','1','2','3','4','5','6','7','8'])
     concatfiles = pd.concat([file1,file2])
     sorted_concatfiles = concatfiles.sort_values(concatfiles.columns[0], ascending =True)
-    #concatfiles.to_csv(Path(args.out, "merged_outputs.tsv"), sep="\t", index=False)
     sorted_concatfiles.to_csv( Path(args.out, "merged_outputs.tsv"), sep="\t", index=False, header=None)
     return str(Path(args.out, "merged_outputs.tsv"))
     
 def sp_lines(tsv):
+    # Returns first query of table and last line 
     with open(tsv, 'r') as t:
         prev_query = t.readline().split('\t')[0] #first line
-        for line in t:
-            pass
-        last_line = line
+        if '//' not in t:
+            with open(tsv, 'a') as t:
+                    t.write('//') #when implemented delete if 
     t.close()
-
-    if '//' not in last_line:
-        with open(tsv, 'a') as t:
-            t.write('//')
-    t.close()
-
     last_line = '//' 
     return prev_query,last_line
 
 def pred(dic,maxormin):
+    # Returns min or max value of a dictionary
     res = 'results' 
     maxormin = str(maxormin)
     if maxormin == 'max': 
@@ -252,6 +214,7 @@ def pred(dic,maxormin):
     return res
 
 def define_final(famname):
+    # Define final name of family 
     final = famname
     final_name = {'KTx':'Scorpion_KTx', 'theraphotoxin':'theraphotoxin', 
                   'NaTx':'Scorpion_NaTx', 'Metalloprotease':'Metalloprotease',
@@ -267,11 +230,11 @@ def define_final(famname):
     return final 
 
 def gen_final_class_and_evalue(dic,method):
+
     Target_toxin = { "beta-":"Sodium channels", "gamma-":"Non-specific cations HCN channels",
            "delta-":"Voltage-Gated Sodium channels", "kappa-":"Voltage-Gated Potassium channels", 
            "mu-":"Voltage-Gated Sodium channels", "tau-":"TRP channels",
-           "omega-":"Calcium channels", "M-":"Membranolytic Activity"
-            }
+           "omega-":"Calcium channels", "M-":"Membranolytic Activity"}
 
     Target = {"KTx":"Potassium channels", "NaTx":"Sodium channels", 
               "CAP":"CRISPs, Antigen-5 or Pathogen-related", "Lectin":"Carbohydrate-binding protein",
@@ -281,25 +244,30 @@ def gen_final_class_and_evalue(dic,method):
               "AstacinLikeMetalloprotease":"Astacin-Like Metalloprotease",
               "TickMetalloprotease":"Neprilysin", "Cytolytic":"Cytolytic Activity",
               "Dermonecrotic":"Sphingomyelin Phosphodiesterase D", "GlycosylHydrolase_Hyaluronidase":"Hydrolase"}
+    
     target = "-"
-    if method == "hmm":
+
+    if method == "hmm": #for hmm get min value 
         result_class = pred(dic,"min")
-    elif method == "pssm":
+    elif method == "pssm": #for pssm get max value 
         result_class = pred(dic,"max")
+    
     if "toxin" in str(result_class):
         for i in Target_toxin.keys():
             if i in str(result_class):
-                target = Target_toxin[i]
+                target = Target_toxin[i]  #define target for neurotoxins
     else:
         for i in Target.keys():
             if i in str(result_class):
-                target = Target[i]
-    result_class_final = define_final(result_class)
-    result_evalue_final = dic[result_class]
+                target = Target[i]  #define target for other toxins
+
+    result_class_final = define_final(result_class) #final name of family
+    result_evalue_final = dic[result_class] #final e-value 
     return result_class,result_class_final,result_evalue_final,target
 
 
 def gen_score(result_hmm_final,result_pssm_final):
+    # Generate score from PSSM and HMM results
     result_final = 'None'
     score = 0 
     if result_hmm_final == result_pssm_final:
@@ -354,35 +322,40 @@ def define_target_final(target_hmm,target_pssm):
         target_final = target_pssm
     return target_final
 
+def have_results(tsv):
+    # Check if file exists
+    if (os.stat(tsv).st_size) == 0:
+        return False
+    else: return True
 
 def classify_and_gen_out(tsv):
     warn("stdout","Generating Classification Results")
     famHMM = {}      #dictionary of HMM families with evalues 
     famPSSM = {}     #dictionary of PSSM families with bitscores
     evaluePSSM = {}  #dictionary of PSSM families with evalues
-    score = 0 
-    found = 0 
+    score = 0        #score for family
+    found = 0        #init number of toxins found 
 
     output = open(Path(args.out, "classification_results.tsv"), "w")
     output.write("Query" + '\t' + "General Classification" + '\t' + "Family" + '\t'
                             + "Possible Target/Function"  + '\t' + "Score" 
                             + '\t' + "PSSM classification" + '\t' + "HMM classification" + '\t' + "PSSM e-value"  
                             + '\t' + "HMM e-value" + '\t' + "PSSM bistcore" + '\n') 
-    prev_query,last_line = sp_lines(tsv)
+    prev_query,last_line = sp_lines(tsv) # first and last lines 
     with open(tsv, 'r') as t:
         for line in t:
             line = line.strip()
             query = line.split('\t')[0]
             if (query != prev_query) or (line == last_line): 
                 target_pssm = '-'
-                if bool(famHMM) == True:
+                if bool(famHMM) == True: #if HMM results exist, get final HMM result  
                     result_hmm,result_hmm_final,evalue_hmm_final,target_hmm = gen_final_class_and_evalue(famHMM,"hmm")
                 else: 
                     result_hmm_final = 'None'
                     evalue_hmm_final = 'None' 
                     target_hmm = '-'
 
-                if bool(famPSSM) == True:
+                if bool(famPSSM) == True: #if PSSM results exist, get final PSSM result 
                     result_pssm,result_pssm_final,bitscore_pssm_final,target_pssm = gen_final_class_and_evalue(famPSSM,"pssm")
                     evalue_pssm_final = evaluePSSM[result_pssm]
                 else:   
@@ -391,10 +364,10 @@ def classify_and_gen_out(tsv):
                     bitscore_pssm_final = 'None'
                     target_pssm = '-'
 
-                result_final,score = gen_score(result_hmm_final,result_pssm_final)
-                write = filter_results(result_final,score)
-                general_class = define_general_class(result_final)
-                target_final = define_target_final(target_hmm,target_pssm)
+                result_final,score = gen_score(result_hmm_final,result_pssm_final) #generate final merged result and score
+                write = filter_results(result_final,score) #filter results to write 
+                general_class = define_general_class(result_final) #define general class for final family
+                target_final = define_target_final(target_hmm,target_pssm) #define final target 
 
                 if write == True:
                     found += 1 
@@ -412,7 +385,7 @@ def classify_and_gen_out(tsv):
             hit   = line.split('\t')[1]
             fam   = hit.split('|')[0]
 
-            if ("|TX" in hit) or ("|VP" in hit): 
+            if ("|TX" in hit) or ("|VP" in hit): #Save PSSM evalue and bitscore in dictionary 
                 pssm = hit.split('|')[0]
                 current_evalue_pssm = float(line.split('\t')[2])
                 current_bitscore = float(line.split('\t')[3])
@@ -421,9 +394,9 @@ def classify_and_gen_out(tsv):
                 if pssm not in evaluePSSM:
                     evaluePSSM[pssm] = current_evalue_pssm 
             else: 
-                evalue_hmm = float(line.split('\t')[2])
+                evalue_hmm = float(line.split('\t')[2]) #Save HMM evalue in dictionary 
                 if fam in famHMM:
-                    famHMM[fam] *= float(evalue_hmm) #multiply evalues  
+                    famHMM[fam] *= float(evalue_hmm) #multiply evalues if more than one for family  
                 else: 
                     famHMM[fam] = float(evalue_hmm) 
     t.close()
@@ -432,6 +405,7 @@ def classify_and_gen_out(tsv):
     return str(Path(args.out, "classification_results.tsv"))
 
 def read_ids_gen_dic(tsv):
+    # Generate list of headers found by PSSM and HMM
     l = []
     with open(tsv, 'r') as t:
         for line in t:
@@ -442,8 +416,13 @@ def read_ids_gen_dic(tsv):
     return l 
 
 def gen_toxprot_output(toxprot,pssmhmm):
+    # BLASTp search against toxprot, and filter for headers not found by PSSM or HMM
     warn("stdout",f"Filtering toxprot results for evalue <= {args.evaluefilter}")
-    found_headers = read_ids_gen_dic(pssmhmm)
+
+    if pssmhmm == "Not_found": # No results from PSSM or HMM
+        found_headers = {}
+    else:
+        found_headers = read_ids_gen_dic(pssmhmm)
     output = open(Path(args.out, "toxprot_results.tsv"), "w")
     with open(toxprot, 'r') as tp:
         found = 0 
@@ -461,11 +440,7 @@ def gen_toxprot_output(toxprot,pssmhmm):
                     prev_header = header
                     if (pident >= args.pidentfilter) and (qcovs >= args.qcovsfilter) and (ppos >= args.pposfilter) and (evalue_tp <= args.evaluefilter):
                         output.write(str(line))
-                        found += 1
-            #else:
-                #if toxprot_out == "Yes":
-                    #if (pident >= args.pidentfilter) and (qcovs >= args.qcovsfilter) and (ppos >= args.pposfilter) and (evalue_tp <= args.evaluefilter):
-                        #output.write(str(line)) 
+                        found += 1 
     tp.close()
     warn("stdout",f"Found {found} putative toxins by BLASTp vs ToxProt Database.")
     return str(Path(args.out, "toxprot_results.tsv"))
@@ -477,8 +452,6 @@ def remove_temp_files():
         os.remove(Path(args.out, f))
     return None
 
-
-
 def main():
     setup()
     fasta = str(args.fasta)
@@ -487,14 +460,17 @@ def main():
     rps = run_rpsblast(fasta)
     toxprot = run_blastp(fasta)
     merged_results = merge_and_sort(hmmscan,rps)
-    final = classify_and_gen_out(merged_results)
-    gen_toxprot_output(toxprot,final)
+    if have_results(merged_results) == True:
+        final = classify_and_gen_out(merged_results)
+        gen_toxprot_output(toxprot,final)
+    else: 
+        warn("stdout","No toxins found")
+        gen_toxprot_output(toxprot,"Not_found")
 
     if args.tempfiles == False:
         remove_temp_files()
     warn("stdout", "Finished analysis.")
     
-
     #hmmscan = parse_hmmscan(str(Path(args.out, "out.hmmer.domtab")))
     #rps = str(Path(args.out, "out.pssm"))
     #parsed = str(Path(args.out, "out.hmmer.domtab.parsed"))
@@ -508,6 +484,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+    #print(have_results(str(Path(args.out, "merged_outputs.tsv"))))
     #print(define_target_final("hkasjd","asdasd"))
     #classify_and_gen_out(str(Path(args.out, "merged_outputs.tsv")))
     #results(str(Path(args.out, "classification_results.tsv")))
