@@ -5,7 +5,7 @@
 
 #### Download ArachnoFamTox 
 ```
-git clone https://github.com/yutakajr/ArachnoFamTox.git ArachnoFamTox
+git clone https://github.com/fmidori/arachnofamtox.git ArachnoFamTox
 ```
 
 #### Change to directory 
