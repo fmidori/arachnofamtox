@@ -1,5 +1,4 @@
 ## ArachnoFamTox: prediction and classification of Arachnids venom and toxin families 
- description
 
 ## Installation 
 
@@ -90,7 +89,11 @@ Inside output directory, results files are created:
 
 [GPL v3](https://github.com/yutakajr/ArachnoFamTox/LICENSE)
 
+## Citation
+
+Abukawa, F.M.(2022). _Abordagens computacionais para identificação e classificação de toxinas em aracnídeos e predição de peptídeos bioativos antivirais_.
+[Master Thesis, Instituto Butantan]. Repositório do Instituto Butantan. (https://repositorio.butantan.gov.br/handle/butantan/4870)
+
 ## Authors
 
 * [Fernanda Midori Abukawa](https://orcid.org/0000-0002-9304-7566)
-* [Milton Yutaka Nishiyama Jr](https://orcid.org/0000-0002-2410-0562)
